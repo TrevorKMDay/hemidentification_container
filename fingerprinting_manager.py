@@ -6,6 +6,8 @@ import pandas as pd
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from load_data import load_data
 
+print("Started")
+
 # Set up argument parsers =======
 
 parser = ap.ArgumentParser()
@@ -34,7 +36,7 @@ train_parser.add_argument("--join", "-j", default=".",
 
 test_parser = subparsers.add_parser('test')
 
-test_parser.add_argument("model", 
+test_parser.add_argument("model",
                          help="Model to use, from this program.")
 
 test_parser.add_argument("test_data")
@@ -56,7 +58,7 @@ if sc == "train":
     output_name = args.output
 
     if os.path.exists(output_name):
-        print(f"\nERROR: File {output_name} already exists! Delete to," 
+        print(f"\nERROR: File {output_name} already exists! Delete to,"
                 "continue.")
         exit(1)
 
@@ -83,7 +85,7 @@ if sc == "train":
 
     print(f"  Predicting groups from {outcome_name}: {set(id[outcome_name])}")
 
-    # Start up the classifier 
+    # Start up the classifier
     clf = LinearDiscriminantAnalysis()
     y = id[outcome_name].tolist()
 
