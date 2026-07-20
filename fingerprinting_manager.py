@@ -32,6 +32,11 @@ train_parser.add_argument("--no-skip-size", action="store_true",
 train_parser.add_argument("--join", "-j", default=".",
                           help="Character to join outcomes on, default: .")
 
+train_parser.add_argument("--keep_groups", "-k", nargs="+", 
+                          metavar=("COL", "VALUE"),
+                          help="Values from the 'fold' column to keep. The " 
+                                "first value is the column ID.")
+
 # Testing
 
 test_parser = subparsers.add_parser('test')
@@ -43,14 +48,30 @@ test_parser.add_argument("test_data")
 
 test_parser.add_argument("output_name")
 
+test_parser.add_argument("--keep_groups", "-k", nargs="+", 
+                          metavar=("COL", "VALUE"),
+                          help="Values from the 'fold' column to keep. The " 
+                                "first value is the column ID.")
+
 args = parser.parse_args()
-
-print(args)
-
 sc = args.subcommand
 
-# Load data ========
+if sc is None: 
+    parser.print_help()
+    exit(1)
 
+print(args)
+# exit()
+
+if len(args.keep_groups) >= 2:
+    keep_col = args.keep_groups[0]
+    keep_values = args.keep_groups[1:]
+else:
+    print("Must supply at least two arguments to '--keep_groups', received: ",
+          f"{args.keep_groups}")
+    exit(1)
+
+# Load data ========
 
 if sc == "train":
 
@@ -58,13 +79,13 @@ if sc == "train":
     output_name = args.output
 
     if os.path.exists(output_name):
-        print(f"\nERROR: File {output_name} already exists! Delete to,"
+        print(f"\nERROR: File '{output_name}' already exists! Delete to "
                 "continue.")
         exit(1)
 
     # Load the data as ID and classifier columns
     data_to_load = args.training_data
-    id, cx = load_data(data_to_load)
+    id, cx = load_data(data_to_load, col=keep_col, col_values=keep_values)
 
     # Check columns are in data
     pred_cols = args.column
@@ -90,6 +111,10 @@ if sc == "train":
     y = id[outcome_name].tolist()
 
     clf.fit(cx, y)
+    # print(clf.explained_variance_ratio_)
+
+    ex_var = [float(round(x, 3)) for x in clf.explained_variance_ratio_]
+    print(f"Explained variance: {ex_var}")
 
     # Save the outcome file name
     result = (outcome_name, clf)
@@ -110,7 +135,7 @@ if sc == "test":
 
     # Load the data as ID and classifier columns
     data_to_load = args.test_data
-    id, cx = load_data(data_to_load)
+    id, cx = load_data(data_to_load, col=keep_col, col_values=keep_values)
 
     # Check that all the columns appear in the data
     if not set(outcome_cols).issubset(id.columns):

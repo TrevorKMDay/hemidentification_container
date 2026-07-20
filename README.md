@@ -7,13 +7,21 @@ The input data must have *n > 0* columns prefixed with `cx_`, these are the
 connections. Any column without a `cx_` prefix is assumed to be an identifier
 column.
 
+## Shared options
+
+- `--keep_cols` sets the name of the column (first argument) and then filters
+    the data (train or test) down to the values given in the second+ arguments
+    to this flag. Therefore, it requires at least two arguments, e.g.
+    `--keep_cols fold 1`.
+
 ## Training
 
 To train a model:
 
     docker run hemidentification train [data] [output] [columns ...]
 
-- `data` is a `pickle` file with the identifier and `cx_` columns described above.
+- `data` is a `pickle` file with the identifier and `cx_` columns described
+    above.
 
 - `output` is the name of a `pickle` file that saves thetrianed model for
     re-use with the `test` subcommand.
