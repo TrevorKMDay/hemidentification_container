@@ -1,0 +1,5 @@
+# Manually created because I'm developing in Conda
+pandas
+scikit-learn==1.8
+numpy
+tqdm

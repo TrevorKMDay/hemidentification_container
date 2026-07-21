@@ -1,5 +1,7 @@
+
 import pickle as pkl
 import numpy as np
+import pprint as pp
 
 def load_data(data_to_load, col=None, col_values=[]):
 
@@ -17,7 +19,7 @@ def load_data(data_to_load, col=None, col_values=[]):
 
     print(f"The data has dimensions: {data.shape}")
 
-    if col not in data.columns:
+    if col is not None and col not in data.columns:
         print(f"WARNING: Did not find group column '{col}' in data, not",
               "subsetting.")
 
@@ -45,6 +47,8 @@ def load_data(data_to_load, col=None, col_values=[]):
 
     id_cols = data.drop(cx.columns, axis=1)
     n_id = id_cols.shape[1]
-    print(f" -> I found {n_id} ID columns: {id_cols.columns.values}.")
+
+    print(f" -> I found {n_id} ID columns:")
+    pp.pprint(id_cols.columns.tolist(), compact=True)
 
     return((id_cols, cx))
