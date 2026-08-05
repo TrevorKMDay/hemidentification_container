@@ -1,11 +1,17 @@
 
 import pickle as pkl
-import numpy as np
 import pprint as pp
+import sys
 
-def load_data(data_to_load, col=None, col_values=[]):
+import numpy as np
+
+
+def load_data(data_to_load, col=None, col_values=None):
 
     # Load data
+    if col_values is None:
+        col_values = []
+
     if ".pickle" in data_to_load:
 
         with open(data_to_load, "rb") as f:
@@ -15,7 +21,7 @@ def load_data(data_to_load, col=None, col_values=[]):
 
         # TO DO: Add CSVs
         print(f"Data format of {data_to_load} not recognized, exiting")
-        exit(1)
+        sys.exit(1)
 
     print(f"The data has dimensions: {data.shape}")
 
@@ -51,4 +57,5 @@ def load_data(data_to_load, col=None, col_values=[]):
     print(f" -> I found {n_id} ID columns:")
     pp.pprint(id_cols.columns.tolist(), compact=True)
 
+    # print([id_cols.shape, cx.shape])
     return((id_cols, cx))
