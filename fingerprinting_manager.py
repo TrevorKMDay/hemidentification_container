@@ -361,8 +361,11 @@ elif sc == "null":
         scalings["n"] = i
 
         scalings1 = pd.concat([scalings1, scalings], ignore_index=True)
+        scalings1["feature"] =scalings1["feature"].astype(object)
 
-    with open(output_name, "wb") as f:
-        pkl.dump(scalings1, f)
+    # with open(output_name, "wb") as f:
+    #     pkl.dump(scalings1, f)
+
+    scalings1.to_csv(output_name, index=False)
 
     print(f"Saved {scalings1.shape} output to {output_name}")
