@@ -4,21 +4,24 @@ import pickle as pkl
 import random
 import sys
 import time
+import datetime as dt
 
 import pandas as pd
+from format_data import format_input
 from load_data import load_data
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.metrics import matthews_corrcoef
 from tqdm import tqdm
 
-print("Started")
+print("Starting hemisphere fingerprinting ...")
+print(dt.datetime.now())
 
 # Set up argument parsers =======
 
 parser = ap.ArgumentParser()
 
 parser.add_argument("--force", "-f", action="store_true",
-                    help="Overwrite existing model file.")
+                    help="Overwrite existing output file.")
 
 parser.add_argument("--join", "-j", default=".",
                     help="Character to join outcomes on, default: .")
@@ -30,20 +33,43 @@ parser.add_argument("--keep_groups", "-k", nargs="+",
 
 subparsers = parser.add_subparsers(dest="subcommand")
 
+# Prepare data
+
+prep_parser = subparsers.add_parser('prepare',
+                                     help="Given -cifti-convert -to-text "
+                                          "outputs and a file with ROI names, "
+                                          "create a file for later processing.")
+
+prep_parser.add_argument("--names", "-n",
+                         help="File with n names, must match dimensionality "
+                              "of input list of pconn files.")
+
+prep_parser.add_argument("output",
+                         help="Pickle file to save prepared data to.")
+
+prep_parser.add_argument("text_file", nargs="+",
+                         help="An n(x)n correlation matrix from "
+                              "-cifti-convert.")
+
 # Training
 
-train_parser = subparsers.add_parser('train', 
+train_parser = subparsers.add_parser('train',
                                      help="Train and save a model based on "
                                           "training data")
 
-train_parser.add_argument("training_data")
+train_parser.add_argument("training_data",
+                          help="Pickle with connections (cx_) and identifier "
+                               "columns (any other column). All columns in "
+                               "the `column` argument must appear in this "
+                               "file")
 
-train_parser.add_argument("output")
+train_parser.add_argument("output",
+                          help="Pickle to save the model and columns to.")
 
 train_parser.add_argument("column", nargs="+",
                           help="Column(s) to predict")
 
-train_parser.add_argument("--no-skip-size", action="store_true",
+train_parser.add_argument("--skip-size-check", action="store_true",
                           help="Do not verify that the input data came from"
                                "one half of a correlation matrix.")
 
@@ -56,9 +82,14 @@ test_parser = subparsers.add_parser('test',
 test_parser.add_argument("model",
                          help="Model to use, from this program.")
 
-test_parser.add_argument("test_data")
+test_parser.add_argument("test_data",
+                          help="Pickle with connections (cx_) and identifier "
+                               "columns (any other column). The requested "
+                               "columns to predict must appear in this data.")
 
-test_parser.add_argument("output")
+test_parser.add_argument("output",
+                         help="CSV to save the results to, one row per input "
+                              "with ground truth, predicted, and all LDs.")
 
 test_parser.add_argument("--keep_groups", "-k", nargs="+", default=None,
                           metavar=("COL", "VALUE"),
@@ -71,7 +102,10 @@ loocv_parser = subparsers.add_parser("loocv",
                                      help="Run a set of LOOCV models and "
                                            "save the results (not models).")
 
-loocv_parser.add_argument("loocv_data")
+loocv_parser.add_argument("loocv_data",
+                          help="Pickle with connections (cx_) and identifier "
+                               "columns (any other column). The requested "
+                               "columns to predict must appear in this data.")
 
 loocv_parser.add_argument("output")
 
@@ -85,15 +119,21 @@ null_parser = subparsers.add_parser("null",
                                           "null repetitions to create an "
                                           "empirical distribution of scalings.")
 
-null_parser.add_argument("null_data")
+null_parser.add_argument("null_data",
+                          help="Pickle with connections (cx_) and identifier "
+                               "columns (any other column). The requested "
+                               "columns to predict must appear in this data.")
 
-null_parser.add_argument("output")
+null_parser.add_argument("output", metavar="CSV",
+                         help="CSV file to save the null scalings to.")
 
 null_parser.add_argument("column", nargs="+",
                          help="Column(s) to shuffle and predict.")
 
 null_parser.add_argument("-n", "--repetitions", type=int, default=1000, nargs=1,
-                         help="Number of boostraps to run, default=1000.")
+                         help="Number of boostraps to run, default=1000. "
+                              "Repetition number is saved to the output `n` "
+                              "column.")
 
 null_parser.add_argument("-y", "--start", action="store_true",
                          help="Do not prompt the user with the estimated "
@@ -107,9 +147,8 @@ sc = args.subcommand
 if sc is None:
     parser.print_help()
     sys.exit(1)
-
-print(args)
-# exit()
+else:
+    print(f"Subcommand: {sc}")
 
 if args.keep_groups is not None:
     if len(args.keep_groups) >= 2:
@@ -133,11 +172,6 @@ elif sc == "loocv":
 elif sc == "null":
     data_to_read = args.null_data
 
-# Load the data as ID and classifier columns
-id, cx = load_data(data_to_read, col=keep_col, col_values=keep_values)
-
-# Create merged columns in the case of multiple outcomes
-j = args.join
 output_name = args.output
 
 def fit_model(cx, y, test=None):
@@ -148,11 +182,11 @@ def fit_model(cx, y, test=None):
 
     # Extract results from the model
     ex_var = clf.explained_variance_ratio_
-    
+
     scalings = pd.DataFrame(clf.scalings_)
     scalings.columns = [f"LD{x}" for x in range(1, scalings.shape[1] + 1)]
     scalings["feature"] = clf.feature_names_in_
-    
+
     if test is not None:
 
         y_hat = clf.predict(test)
@@ -170,27 +204,36 @@ def fit_model(cx, y, test=None):
 
 if not args.force and os.path.exists(output_name):
     print(f"\nERROR: File '{output_name}' already exists! Delete to "
-            "continue.")
+            "continue.\n")
     sys.exit(1)
 
-if sc in ["train", "loocv", "null"]:
+if sc in ["train", "test", "loocv", "null"]:
 
-    # Check columns are in data
+    # Load the data as ID and classifier columns
+    id, cx = load_data(data_to_read, col=keep_col, col_values=keep_values)
 
-    pred_cols = args.column
-    for col in pred_cols:
-        if col not in id.columns:
-            print(f"ERROR: Did not find column {col} in the data, exiting")
+    # Create merged columns in the case of multiple outcomes
+    j = args.join
 
-    # If there is only one column to predict, pass it on
-    if len(pred_cols) == 1:
-        outcome_name = pred_cols[0]
-    else:
-        # Otherwise, join the values with an arbitrary column
-        print("  -> More than one column to predict")
-        outcome_name = j.join(pred_cols)
-        outcome_df = id[pred_cols]
-        id[outcome_name] = outcome_df.apply(j.join, axis=1)
+    # There is no "column" value for the 'test' subcommand: it is included
+    # in the serialized object
+    if sc in ["train", "loocv", "null"]:
+
+        # Check columns are in data
+        pred_cols = args.column
+        for col in pred_cols:
+            if col not in id.columns:
+                print(f"ERROR: Did not find column {col} in the data, exiting")
+
+        # If there is only one column to predict, pass it on
+        if len(pred_cols) == 1:
+            outcome_name = pred_cols[0]
+        else:
+            # Otherwise, join the values with an arbitrary column
+            print("  -> More than one column to predict")
+            outcome_name = j.join(pred_cols)
+            outcome_df = id[pred_cols]
+            id[outcome_name] = outcome_df.apply(j.join, axis=1)
 
 if sc == "train":
 
@@ -216,13 +259,12 @@ if sc == "train":
     with open(output_name, "wb") as f:
         pkl.dump(result, f)
 
-    print(f"\nClassifier saved to {output_name}!")
+    print(f"\nClassifier saved to {output_name}!\n")
 
 elif sc == "test":
 
     with open(args.model, "rb") as f:
-        # The scalings are the third element of this data type
-        outcome_name, clf, _ = pkl.load(f)
+        outcome_name, clf = pkl.load(f)
 
     outcome_cols = outcome_name.split('.')
 
@@ -369,3 +411,16 @@ elif sc == "null":
     scalings1.to_csv(output_name, index=False)
 
     print(f"Saved {scalings1.shape} output to {output_name}")
+
+elif sc == "prepare":
+
+    files = args.text_file
+    formatted_data = format_input(files, "foo", file_with_names=args.names)
+
+    # formatted_data.to_csv(args.output)
+    with open(args.output, 'wb') as f:
+        pkl.dump(formatted_data, f)
+
+    # For debugging
+    formatted_data.to_csv(f"{args.output.replace('pickle', 'csv')}",
+                          index=False)

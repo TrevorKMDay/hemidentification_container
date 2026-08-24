@@ -1,6 +1,9 @@
 # Use a lightweight Python base image
 FROM python:3.13-slim
 
+ARG BUILD_VERSION
+ENV APP_VERSION=$BUILD_VERSION
+
 # Install system dependencies if required by pandas wheel builds
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
