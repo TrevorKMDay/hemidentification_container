@@ -7,6 +7,9 @@ import pandas as pd
 
 def pivot_matrix(matrix, label, names=None):
 
+    # Only do this to connections
+    # matrix = matrix.filter(regex = r'^cx_', axis=1)
+
     if names is not None:
         matrix.index = names
 

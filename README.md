@@ -17,7 +17,6 @@ column.
     names where possible. The container will check and remove; but if you are
     already tweaking ROI names, then also remove underscores.
 
-
 ## Shared options
 
 - `--force`: Each subcommand has an output file; it is never overwritten unless
@@ -32,6 +31,10 @@ column.
     the data (train or test) down to the values given in the second+ arguments
     to this flag. Therefore, it requires at least two arguments, e.g.
     `--keep_cols fold 1`.
+
+Note that `keep_cols` only keeps the rows that match all values, e.g.
+`-k fold 1 patient hc` keeps all the healthy controls from fold 1. More
+advanced subsetting should be added to the data
 
 ## Preparing
 

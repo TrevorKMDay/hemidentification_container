@@ -1,10 +1,13 @@
 import argparse as ap
+import datetime as dt
 import os
 import pickle as pkl
+import pprint as pp
 import random
 import sys
 import time
-import datetime as dt
+from itertools import batched
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from format_data import format_input
@@ -13,8 +16,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.metrics import matthews_corrcoef
 from tqdm import tqdm
 
-print("Starting hemisphere fingerprinting ...")
-print(dt.datetime.now())
+print("\n\nStarting hemisphere fingerprinting ...")
+print(dt.datetime.now(tz=ZoneInfo("America/New_York")))
 
 # Set up argument parsers =======
 
@@ -25,6 +28,9 @@ parser.add_argument("--force", "-f", action="store_true",
 
 parser.add_argument("--join", "-j", default=".",
                     help="Character to join outcomes on, default: .")
+
+parser.add_argument("--verbose", "-v", action="store_true",
+                    help="Be verbose")
 
 parser.add_argument("--keep_groups", "-k", nargs="+",
                     metavar=("COL", "VALUE"),
@@ -144,6 +150,9 @@ null_parser.add_argument("-y", "--start", action="store_true",
 args = parser.parse_args()
 sc = args.subcommand
 
+if args.verbose:
+    pp.pprint(args)
+
 if sc is None:
     parser.print_help()
     sys.exit(1)
@@ -151,15 +160,19 @@ else:
     print(f"Subcommand: {sc}")
 
 if args.keep_groups is not None:
-    if len(args.keep_groups) >= 2:
-        keep_col = args.keep_groups[0]
-        keep_values = args.keep_groups[1:]
+    if len(args.keep_groups) % 2 == 0:
+        keep_pairs = list(batched(args.keep_groups, 2))
     else:
-        print("Must supply at least two arguments to '--keep_groups', ",
-             f"received: {args.keep_groups}.")
+        print("Must supply at least an even number of arguments to "
+              f"'--keep_groups' received: {args.keep_groups}.")
         sys.exit(1)
 else:
-    keep_col = keep_values = None
+    keep_pairs = None
+
+if args.verbose:
+    print("\nINFO:  Filtering pairs:")
+    pp.pprint(keep_pairs)
+    print()
 
 # Load data ========
 
@@ -210,7 +223,7 @@ if not args.force and os.path.exists(output_name):
 if sc in ["train", "test", "loocv", "null"]:
 
     # Load the data as ID and classifier columns
-    id, cx = load_data(data_to_read, col=keep_col, col_values=keep_values)
+    id, cx = load_data(data_to_read, keep_pairs=keep_pairs)
 
     # Create merged columns in the case of multiple outcomes
     j = args.join
@@ -234,6 +247,8 @@ if sc in ["train", "test", "loocv", "null"]:
             outcome_name = j.join(pred_cols)
             outcome_df = id[pred_cols]
             id[outcome_name] = outcome_df.apply(j.join, axis=1)
+
+        print(f"Outcome is: {outcome_name}")
 
 if sc == "train":
 
@@ -281,7 +296,19 @@ elif sc == "test":
     y_hat = pd.DataFrame({f"{outcome_name}_predicted": clf.predict(cx)})
     scores = pd.DataFrame(clf.transform(cx))
     scores.columns = [f"LD{x}" for x in range(1, scores.shape[1] + 1)]
+
     final = pd.concat([id, y_hat, scores], axis=1)
+
+    print("\nResults:\n")
+    print(pd.crosstab(final[outcome_name],
+                      final[f"{outcome_name}_predicted"]))
+
+    # Calculate accuracy
+    n = final.shape[0]
+    acc = sum(final[outcome_name] == final[f"{outcome_name}_predicted"]) / n
+
+    print()
+    print(f"Accuracy: {acc:.3f}")
 
     final.to_csv(args.output, index=False)
 
@@ -311,11 +338,14 @@ elif sc == "loocv":
         y = train_id[outcome_name].tolist()
 
         # Start up the classifier
-        clf, _, _, y_hat, scores = fit_model(train_cx, y, test=test_cx)
+        clf, _, _, y_hat, _ = fit_model(train_cx, y, test=test_cx)
+        y_hat_df = pd.DataFrame({f"{outcome_name}_predicted": y_hat})
 
         # One-row pandas DF
-        i_final = pd.concat([test_id, y_hat, scores], axis=1)
+        i_final = pd.concat([test_id, y_hat_df], axis=1)
         i_final.reset_index(drop=True, inplace=True)
+
+        # print(i_final)
 
         results += [i_final]
 

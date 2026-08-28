@@ -4,13 +4,10 @@ import pprint as pp
 import sys
 
 import numpy as np
+import pandas as pd
 
 
-def load_data(data_to_load, col=None, col_values=None):
-
-    # Load data
-    if col_values is None:
-        col_values = []
+def load_data(data_to_load, keep_pairs=None):
 
     if ".pickle" in data_to_load:
 
@@ -25,23 +22,22 @@ def load_data(data_to_load, col=None, col_values=None):
 
     print(f"The data has dimensions: {data.shape}")
 
-    if col is not None and col not in data.columns:
-        print(f"WARNING: Did not find group column '{col}' in data, not",
-              "subsetting.")
-
     # Fix this to display column names not NaN count
-    nans_in_input = data.isna().sum()
-    nans_in_input_names = [col for x, col in zip(nans_in_input, data.columns)
+    cx = data.filter(regex = r'^cx_', axis=1)
+    nans_in_input = cx.isna().sum()
+    nans_in_input_names = [col for x, col in zip(nans_in_input, cx.columns)
                            if x > 0]
-    print(f"WARNING: {len(nans_in_input_names)} columns have at least 1 NaN "
-          "value")
+
+    if len(nans_in_input_names) > 0:
+        print(f"WARNING: {len(nans_in_input_names)} connection columns have "
+              "at least 1 NaN value")
 
     if len(nans_in_input_names) > 0:
 
-        all_nans = [col for x, col in zip(nans_in_input, data.columns)
-                    if x > data.shape[0] / 2]
-        lt50pct_nans = [(x, col) for x, col in zip(nans_in_input, data.columns)
-                        if x <= data.shape[0] / 2 and x > 0]
+        all_nans = [col for x, col in zip(nans_in_input, cx.columns)
+                    if x > cx.shape[0] / 2]
+        lt50pct_nans = [(x, col) for x, col in zip(nans_in_input, cx.columns)
+                        if x <= cx.shape[0] / 2 and x > 0]
 
         # pp.pprint(lt50pct_nans, compact=True)
 
@@ -80,16 +76,38 @@ def load_data(data_to_load, col=None, col_values=None):
         print(f"This does not seem to be (size: {corr_mat_size}), exiting.")
         # print("Use --no-check-size to skip this check")
 
-    if col in data.columns:
-        rows_to_keep = data[col].isin(col_values)
-        print(f" -> Kept {sum(rows_to_keep)}/{cx.shape[0]} training rows.")
+    # Subset data
+    if keep_pairs is not None:
+
+        keep_matrix = pd.DataFrame(data = None,
+                                    index=range(data.shape[0]),
+                                    columns=range(len(keep_pairs)))
+
+        for i, (col, value) in enumerate(keep_pairs):
+
+            if col not in data.columns:
+                print(f"WARNING: Did not find group column '{col}' in data, ",
+                        "skipping this column.")
+                continue
+
+            i_rows_to_keep = [x == value for x in data[col]]
+            n_removed = len(i_rows_to_keep) - sum(i_rows_to_keep)
+            print(f" -> Removed {n_removed} rows based on {col}")
+
+            keep_matrix.iloc[:, i] = i_rows_to_keep
+
+        # Does this row meet all conditions?
+        rows_to_keep = keep_matrix.all(axis=1)
 
         data = data[rows_to_keep]
         cx = cx[rows_to_keep]
 
+
+    else:
+        print("INFO: No subsetting requested")
+
     id_cols = data.drop(cx.columns, axis=1)
     n_id = id_cols.shape[1]
-
     print(f" -> I found {n_id} ID columns:")
     # pp.pprint(id_cols.columns.tolist(), compact=True)
 
