@@ -102,14 +102,17 @@ def load_data(data_to_load, keep_pairs=None):
         data = data[rows_to_keep]
         cx = cx[rows_to_keep]
 
-
     else:
         print("INFO: No subsetting requested")
 
     id_cols = data.drop(cx.columns, axis=1)
     n_id = id_cols.shape[1]
     print(f" -> I found {n_id} ID columns:")
-    # pp.pprint(id_cols.columns.tolist(), compact=True)
 
-    # print([id_cols.shape, cx.shape])
+    assert id_cols.shape[0] > 0, "ERROR: No rows returned after filtering " + \
+        "ID columns, check filtering."
+
+    assert cx.shape[0] > 0, "ERROR: No rows returned after filtering " + \
+        "connection columns, check filtering."
+
     return((id_cols, cx))

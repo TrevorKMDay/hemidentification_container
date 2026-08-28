@@ -151,7 +151,7 @@ args = parser.parse_args()
 sc = args.subcommand
 
 if args.verbose:
-    pp.pprint(args)
+    pp.pprint(vars(args))
 
 if sc is None:
     parser.print_help()
@@ -205,7 +205,7 @@ def fit_model(cx, y, test=None):
         y_hat = clf.predict(test)
 
         # Return pretty scores
-        scores = pd.DataFrame(clf.transform(cx))
+        scores = pd.DataFrame(clf.transform(test))
         scores.columns = [f"LD{x}" for x in range(1, scores.shape[1] + 1)]
         scores.reset_index(drop=True, inplace=True)
 
@@ -314,6 +314,8 @@ elif sc == "test":
 
 elif sc == "loocv":
 
+    print(id.shape)
+    print(cx.shape)
     n = id.shape[0]
 
     # Reset the index so it's 0-n instead of maintaing the index before any
@@ -322,11 +324,11 @@ elif sc == "loocv":
 
     print(f"\nRunning {n} LOOCV repetitions")
 
+    # We are going to append each set of results to a list then concatenate
+    # the list of DFs - not optimal
     results = []
-
     for i in tqdm(range(n)):
 
-        # print(id)
 
         train_id = id.drop(i)
         train_cx = cx.drop(i)
@@ -338,11 +340,13 @@ elif sc == "loocv":
         y = train_id[outcome_name].tolist()
 
         # Start up the classifier
-        clf, _, _, y_hat, _ = fit_model(train_cx, y, test=test_cx)
+        clf, _, _, y_hat, scores = fit_model(train_cx, y, test=test_cx)
         y_hat_df = pd.DataFrame({f"{outcome_name}_predicted": y_hat})
 
+        # print(scores)
+
         # One-row pandas DF
-        i_final = pd.concat([test_id, y_hat_df], axis=1)
+        i_final = pd.concat([test_id, y_hat_df, scores], axis=1)
         i_final.reset_index(drop=True, inplace=True)
 
         # print(i_final)
@@ -376,7 +380,7 @@ elif sc == "loocv":
 
     print(f"MCC:      {mcc:.3f}")
 
-    result.to_csv(args.output)
+    result.to_csv(args.output, index=False)
 
 elif sc == "null":
 
