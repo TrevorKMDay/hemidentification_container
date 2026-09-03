@@ -18,24 +18,28 @@ from tqdm import tqdm
 
 print("\n\nStarting hemisphere fingerprinting ...")
 print(dt.datetime.now(tz=ZoneInfo("America/New_York")))
+print( )
 
 # Set up argument parsers =======
 
 parser = ap.ArgumentParser()
 
 parser.add_argument("--force", "-f", action="store_true",
-                    help="Overwrite existing output file.")
+                    help="Overwrite existing output file, default: False")
 
 parser.add_argument("--join", "-j", default=".",
-                    help="Character to join outcomes on, default: .")
+                    help="Character to join outcomes on, default: '.'")
 
 parser.add_argument("--verbose", "-v", action="store_true",
-                    help="Be verbose")
+                    help="Be verbose, default: False")
 
 parser.add_argument("--keep_groups", "-k", nargs="+",
                     metavar=("COL", "VALUE"),
                     help="Values from the 'fold' column to keep. The "
-                         "first value is the column ID. Use `--` to end list.")
+                         "first value is the column ID. The second value is "
+                         "the one value to keep. Multiple pairs operate as "
+                         "intersection. Must be a list of pairs. "
+                         "Must use `--` to end list.")
 
 subparsers = parser.add_subparsers(dest="subcommand")
 
@@ -96,11 +100,6 @@ test_parser.add_argument("test_data",
 test_parser.add_argument("output",
                          help="CSV to save the results to, one row per input "
                               "with ground truth, predicted, and all LDs.")
-
-test_parser.add_argument("--keep_groups", "-k", nargs="+", default=None,
-                          metavar=("COL", "VALUE"),
-                          help="Values from the 'fold' column to keep. The "
-                                "first value is the column ID.")
 
 # LOOCV ====
 
@@ -294,9 +293,12 @@ elif sc == "test":
 
     # Scores
     y_hat = pd.DataFrame({f"{outcome_name}_predicted": clf.predict(cx)})
+
     scores = pd.DataFrame(clf.transform(cx))
     scores.columns = [f"LD{x}" for x in range(1, scores.shape[1] + 1)]
 
+    # Reset index so that all three of these run [0, n-1].
+    id.reset_index(inplace=True)
     final = pd.concat([id, y_hat, scores], axis=1)
 
     print("\nResults:\n")

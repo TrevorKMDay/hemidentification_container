@@ -11,6 +11,7 @@ def load_data(data_to_load, keep_pairs=None):
 
     if ".pickle" in data_to_load:
 
+        print(f"Loading data from file: {data_to_load}")
         with open(data_to_load, "rb") as f:
             data = pkl.load(f)
 
