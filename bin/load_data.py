@@ -15,6 +15,10 @@ def load_data(data_to_load, keep_pairs=None):
         with open(data_to_load, "rb") as f:
             data = pkl.load(f)
 
+    elif ".csv" in data_to_load:
+
+        data = pd.read_csv(data_to_load)
+
     else:
 
         # TO DO: Add CSVs

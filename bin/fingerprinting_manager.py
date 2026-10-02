@@ -301,6 +301,11 @@ elif sc == "test":
     id.reset_index(inplace=True)
     final = pd.concat([id, y_hat, scores], axis=1)
 
+    # Need to create joined colum
+    if len(outcome_cols) > 1:
+        f_outcome_cols = final[outcome_cols]
+        final[outcome_name] = f_outcome_cols.apply(j.join, axis=1)
+
     print("\nResults:\n")
     print(pd.crosstab(final[outcome_name],
                       final[f"{outcome_name}_predicted"]))
