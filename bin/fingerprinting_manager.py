@@ -257,11 +257,14 @@ if sc == "train":
     # Start up the classifier
     y = id[outcome_name].tolist()
 
+
     # Only need the model and explained variance
     clf, _, ex_var, _, _ = fit_model(cx, y)
 
     print("  Results:")
+    print(clf.explained_variance_ratio_)
 
+    # Round this for echoing
     ex_var_rnd = [float(round(x, 3)) for x in ex_var]
     print(f"    Explained variance: {ex_var_rnd}")
 
@@ -281,6 +284,9 @@ elif sc == "test":
     with open(args.model, "rb") as f:
         outcome_name, clf = pkl.load(f)
 
+    # print(f"Outcome name: {outcome_name}")
+    # print(f"Classifier: {clf}")
+
     outcome_cols = outcome_name.split('.')
 
     print(f"Predicting column(s) '{outcome_cols}' from the data.")
@@ -296,7 +302,12 @@ elif sc == "test":
     y_hat = pd.DataFrame({f"{outcome_name}_predicted": clf.predict(cx)})
 
     scores = pd.DataFrame(clf.transform(cx))
+    print("Scores:")
+    print(clf.transform(cx))
+
     scores.columns = [f"LD{x}" for x in range(1, scores.shape[1] + 1)]
+
+    print(scores)
 
     # Reset index so that all three of these run [0, n-1].
     id.reset_index(inplace=True)

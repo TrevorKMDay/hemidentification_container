@@ -98,7 +98,7 @@ def load_data(data_to_load, keep_pairs=None):
             # print(value)
             if value.startswith("!"):
                 value = re.sub("^!", "", value)
-                print(f" -> Inverting relation and keeping rows where {col} ", 
+                print(f" -> Inverting relation and keeping rows where {col}",
                       f"is not '{value}'")
                 i_rows_to_keep = [x != value for x in data[col]]
                 op = "!="
@@ -107,7 +107,7 @@ def load_data(data_to_load, keep_pairs=None):
                 op = "="
 
             n_removed = len(i_rows_to_keep) - sum(i_rows_to_keep)
-            print(f" -> Removed {n_removed} rows based on {col}{op}'{value}'")
+            print(f" -> Removed {n_removed} rows based on {col} {op} '{value}'")
 
             keep_matrix.iloc[:, i] = i_rows_to_keep
 
@@ -122,7 +122,7 @@ def load_data(data_to_load, keep_pairs=None):
 
     id_cols = data.drop(cx.columns, axis=1)
     n_id = id_cols.shape[1]
-    print(f" -> I found {n_id} ID columns:")
+    print(f" -> I found {n_id} ID columns: {id_cols.columns.tolist()}")
 
     assert id_cols.shape[0] > 0, "ERROR: No rows returned after filtering " + \
         "ID columns, check filtering."
