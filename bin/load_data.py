@@ -5,7 +5,7 @@ import sys
 
 import numpy as np
 import pandas as pd
-
+import re
 
 def load_data(data_to_load, keep_pairs=None):
 
@@ -95,9 +95,19 @@ def load_data(data_to_load, keep_pairs=None):
                         "skipping this column.")
                 continue
 
-            i_rows_to_keep = [x == value for x in data[col]]
+            # print(value)
+            if value.startswith("!"):
+                value = re.sub("^!", "", value)
+                print(f" -> Inverting relation and keeping rows where {col} ", 
+                      f"is not '{value}'")
+                i_rows_to_keep = [x != value for x in data[col]]
+                op = "!="
+            else:
+                i_rows_to_keep = [x == value for x in data[col]]
+                op = "="
+
             n_removed = len(i_rows_to_keep) - sum(i_rows_to_keep)
-            print(f" -> Removed {n_removed} rows based on {col}")
+            print(f" -> Removed {n_removed} rows based on {col}{op}'{value}'")
 
             keep_matrix.iloc[:, i] = i_rows_to_keep
 

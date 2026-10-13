@@ -37,7 +37,8 @@ parser.add_argument("--keep_groups", "-k", nargs="+",
                     metavar=("COL", "VALUE"),
                     help="Values from the 'fold' column to keep. The "
                          "first value is the column ID. The second value is "
-                         "the one value to keep. Multiple pairs operate as "
+                         "the one value to keep. Check inequality by prefixing "
+                         "value with '!'. Multiple pairs operate as "
                          "intersection. Must be a list of pairs. "
                          "Must use `--` to end list.")
 
