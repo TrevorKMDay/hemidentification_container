@@ -16,16 +16,32 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.metrics import matthews_corrcoef
 from tqdm import tqdm
 
-print("\n\nStarting hemisphere fingerprinting ...")
-print(dt.datetime.now(tz=ZoneInfo("America/New_York")))
-print( )
+VERSION="0.4.2"
+BUILD_DATE="Wed Oct 21 17:35:43 EDT 2026"
+
+# Source - https://stackoverflow.com/a/22157136
+# Posted by Anthon, modified by community.
+# Retrieved 2026-10-21, License - CC BY-SA 3.0
+class SmartFormatter(ap.HelpFormatter):
+    def _split_lines(self, text, width):
+        if text.startswith('R|'):
+            return text[2:].splitlines()  
+        # this is the RawTextHelpFormatter._split_lines
+        return ap.HelpFormatter._split_lines(self, text, width)
 
 # Set up argument parsers =======
 
-parser = ap.ArgumentParser()
+parser = ap.ArgumentParser(formatter_class=SmartFormatter)
 
-parser.add_argument("--force", "-f", action="store_true",
-                    help="Overwrite existing output file, default: False")
+# parser.add_argument("--force", "-f", action="store_true",
+#                     help="Overwrite existing output file, default: False")
+
+parser.add_argument("--file_conflict", "-f", 
+                    choices=["strict", "compare", "force"],
+                    default="strict",
+                    help="R|strict:  Do not replace an existing file\n"
+                         "compare: Rerun if input data is newer\n"
+                         "force:   Always recreate output.")
 
 parser.add_argument("--join", "-j", default=".",
                     help="Character to join outcomes on, default: '.'")
@@ -35,16 +51,21 @@ parser.add_argument("--verbose", "-v", action="store_true",
 
 parser.add_argument("--keep_groups", "-k", nargs="+",
                     metavar=("COL", "VALUE"),
-                    help="Values from the 'fold' column to keep. The "
-                         "first value is the column ID. The second value is "
-                         "the one value to keep. Check inequality by prefixing "
-                         "value with '!'. Multiple pairs operate as "
-                         "intersection. Must be a list of pairs. "
+                    help="R|Values from the 'fold' column to keep.\n"
+                         "The first value is the column ID.\n"
+                         "The second value is the one value to keep.\n"
+                         "Check inequality by prefixing value with '!'.\n"
+                         "Multiple pairs operate as intersection.\n"
+                         "Must be a list of pairs.\n"
                          "Must use `--` to end list.")
 
 subparsers = parser.add_subparsers(dest="subcommand")
 
 # Prepare data
+
+prep_parser = subparsers.add_parser('version',
+                                     help="Report version and exit.")
+
 
 prep_parser = subparsers.add_parser('prepare',
                                      help="Given -cifti-convert -to-text "
@@ -153,11 +174,22 @@ sc = args.subcommand
 if args.verbose:
     pp.pprint(vars(args))
 
-if sc is None:
+if sc == "version":
+    print(f"Version:    {VERSION}")
+    print(f"Build date: {BUILD_DATE}")
+    print("GitHub:     "
+          "https://github.com/TrevorKMDay/hemidentification_container")
+    sys.exit(0)
+elif sc is None:
     parser.print_help()
     sys.exit(1)
-else:
-    print(f"Subcommand: {sc}")
+
+
+print("Starting hemisphere fingerprinting ...")
+print(f"Version: {VERSION}")
+print(f"Start: {dt.datetime.now(tz=ZoneInfo('America/New_York'))}")
+print()
+print(f"Subcommand: {sc}")
 
 if args.keep_groups is not None:
     if len(args.keep_groups) % 2 == 0:
@@ -174,6 +206,8 @@ if args.verbose:
     pp.pprint(keep_pairs)
     print()
 
+clobber = args.file_conflict
+
 # Load data ========
 
 if sc == "train":
@@ -186,6 +220,59 @@ elif sc == "null":
     data_to_read = args.null_data
 
 output_name = args.output
+
+def is_output_newer(in_file, out_file): 
+    
+    in_ts = os.path.getmtime(in_file)
+    out_ts = os.path.getmtime(out_file)
+
+    f1 = in_file if in_ts > out_ts else out_file
+    f2 = out_file if in_ts > out_ts else in_file
+        
+    print(f"INFO: '{f1}' is newer "
+          f"({dt.datetime.fromtimestamp(max(in_ts, out_ts))}) than '{f2}' "
+          f"({dt.datetime.fromtimestamp(min(in_ts, out_ts))}).")
+
+    # Return whether the output file is newer
+    return (out_ts > in_ts)
+
+if os.path.exists(output_name):
+
+    # Compare the input/output
+
+    # If strict, and the output exists, don't clobber it
+    if clobber == "strict":
+
+        print(f"\nERROR: File '{output_name}' already exists! Delete or use "
+              "'--file_conflict compare' or '--file_conflict force' to "
+              "continue.\n")
+        sys.exit(1)
+
+    # Check timestamps if 'compare' is set, and exit if the output is newer
+    # than the input
+    elif clobber == "compare":
+
+        out_nt_in = is_output_newer(data_to_read, output_name)
+
+        # Only the test module has a second input, so if we're not testing,
+        # pass True to the all() check below so it passes unless the model
+        # is newer than the output.
+        model_nt_in = is_output_newer(args.model, output_name) \
+            if sc == "test" else True
+
+        # Check that all conditions are met, and exit with a good exit status
+        # if the output is newer than the inputs.
+        if all([out_nt_in, model_nt_in]):
+            print(f"INFO: The output file '{output_name}' is newer than the"
+                  "input(s), not doing anything.\n")
+            sys.exit(0)
+
+    # If forcing, don't check anything and keep going
+    elif clobber == "force":
+
+        print(f"WARNING: Overwriting output file {output_name} without "
+              "checking.\n")
+
 
 def fit_model(cx, y, test=None):
 
@@ -214,11 +301,7 @@ def fit_model(cx, y, test=None):
 
     return([clf, scalings, ex_var, y_hat, scores])
 
-
-if not args.force and os.path.exists(output_name):
-    print(f"\nERROR: File '{output_name}' already exists! Delete to "
-            "continue.\n")
-    sys.exit(1)
+# sys.exit()
 
 if sc in ["train", "test", "loocv", "null"]:
 
