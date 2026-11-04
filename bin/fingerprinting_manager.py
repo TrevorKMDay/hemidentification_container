@@ -12,18 +12,20 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from format_data import format_input
 from load_data import load_data
+from is_output_newer import is_output_newer
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.metrics import matthews_corrcoef
 from tqdm import tqdm
 
 VERSION="0.5.0"
-BUILD_DATE="Wed Nov  4 09:43:16 EST 2026"
+BUILD_DATE="Wed Nov  4 09:58:04 EST 2026"
 
-# Source - https://stackoverflow.com/a/22157136
-# Posted by Anthon, modified by community.
-# Retrieved 2026-10-21, License - CC BY-SA 3.0
 class SmartFormatter(ap.HelpFormatter):
+    # Source - https://stackoverflow.com/a/22157136
+    # Posted by Anthon, modified by community.
+    # Retrieved 2026-10-21, License - CC BY-SA 3.0
     def _split_lines(self, text, width):
+        """Allow forced line breaks in argparse help text."""
         if text.startswith('R|'):
             return text[2:].splitlines()
         # this is the RawTextHelpFormatter._split_lines
@@ -32,9 +34,6 @@ class SmartFormatter(ap.HelpFormatter):
 # Set up argument parsers =======
 
 parser = ap.ArgumentParser(formatter_class=SmartFormatter)
-
-# parser.add_argument("--force", "-f", action="store_true",
-#                     help="Overwrite existing output file, default: False")
 
 parser.add_argument("--file_conflict", "-f",
                     choices=["strict", "compare", "force"],
@@ -168,6 +167,7 @@ null_parser.add_argument("-y", "--start", action="store_true",
 
 # Parse args =====
 
+# Give some cleaner names
 args = parser.parse_args()
 sc = args.subcommand
 verbose = args.verbose
@@ -178,6 +178,7 @@ if verbose:
     print()
 
 if sc == "version":
+    # If only 'version' print info and quit with zero exit status
     print(f"Version:    {VERSION}")
     print(f"Build date: {BUILD_DATE}")
     print("GitHub:     "
@@ -186,7 +187,6 @@ if sc == "version":
 elif sc is None:
     parser.print_help()
     sys.exit(1)
-
 
 print("Starting hemisphere fingerprinting ...")
 print(f"Version: {VERSION}")
@@ -235,21 +235,6 @@ if sc in ["test", "loocv", "null"]:
         print(f"ERROR: Unexpected format: {output_name} should be '.csv' " +
               "for null.")
         sys.exit(1)
-
-def is_output_newer(in_file, out_file):
-
-    in_ts = os.path.getmtime(in_file)
-    out_ts = os.path.getmtime(out_file)
-
-    f1 = in_file if in_ts > out_ts else out_file
-    f2 = out_file if in_ts > out_ts else in_file
-
-    print(f"INFO: '{f1}' is newer "
-          f"({dt.datetime.fromtimestamp(max(in_ts, out_ts))}) than '{f2}' "
-          f"({dt.datetime.fromtimestamp(min(in_ts, out_ts))}).")
-
-    # Return whether the output file is newer
-    return(out_ts > in_ts)
 
 # Check for zipped csvs
 output_name_zip = output_name.replace(".csv", ".zip")
@@ -316,6 +301,27 @@ if os.path.exists(output_comparison_file):
 sys.exit()
 
 def fit_model(cx, y, test=None):
+
+    """Fit a linear discriminant model.
+
+    Fit a model predicting y from the predictor data frame cx.
+    If test=True, predict the predictor data frame against the same model and
+    return the scores. Returns C-1 LDs, where *C* is the number of outcome
+    categories.
+
+    Keyword arguments:
+    cx: The NxM matrix of predictors (M).
+    y: A length-M vector of outcomes (categorical)
+    test: Whether to test cx against the newly trained model (default: False).
+
+    Returns a list of the following:
+    clf: The model object.
+    scalings: The scalings from the model.
+    ex_var: The clf.explained_variance_ratio_ object
+    y_hat: The predicted categories (None if test=False)
+    scores: A Nx(C-1) matrix of LD scores (None if test=False)
+
+    """
 
     # Fit the model
     clf = LinearDiscriminantAnalysis()
@@ -456,7 +462,7 @@ elif sc == "test":
     final.to_csv(args.output, index=False)
 
 elif sc == "loocv":
-#
+
     # print(id.shape)
     # print(cx.shape)
     n = id.shape[0]
