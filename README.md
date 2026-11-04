@@ -19,8 +19,15 @@ column.
 
 ## Shared options
 
-- `--force`: Each subcommand has an output file; it is never overwritten unless
-    the global force option is passed.
+- `--file_conflict`: Each subcommand has an output file, what to do with it?
+  - `strict`: If that file exists, don't do anything.
+  - `compare` If that file exists, and is newer than the input(s), don't do
+     anything.
+  - `force`: Regardless of timestamps, recreate the output.
+  - **NB**: The `null` subcommand, especially creates large CSVs. The file
+    conflict routine checks if an identically named `.zip` file exists, and
+    compares against that, in case you zipped the output (only for `.csv`
+    files).
 
 - `--join`: What character to combine the input categories into, default: `.`.
     If there are already periods in the values, change this. For example,
@@ -126,7 +133,7 @@ The default `N` is 1000, which is probably too low for publication, but a
 decent starting value for testing.
 
 By default, the code calculates how long the excution will take, and asks you
-if you want to start (thus, the `-it` flag is required to interact with the
+if you want to start (the `-it` flag is required to interact with the
 container in this way).
 
 You can skip this by adding the `-y` flag, however, either `run -t` *or*

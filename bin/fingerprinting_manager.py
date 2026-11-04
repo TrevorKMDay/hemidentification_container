@@ -16,8 +16,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.metrics import matthews_corrcoef
 from tqdm import tqdm
 
-VERSION="0.4.2"
-BUILD_DATE="Wed Oct 21 17:35:43 EDT 2026"
+VERSION="0.5.0"
+BUILD_DATE="Wed Nov  4 09:43:16 EST 2026"
 
 # Source - https://stackoverflow.com/a/22157136
 # Posted by Anthon, modified by community.
@@ -25,7 +25,7 @@ BUILD_DATE="Wed Oct 21 17:35:43 EDT 2026"
 class SmartFormatter(ap.HelpFormatter):
     def _split_lines(self, text, width):
         if text.startswith('R|'):
-            return text[2:].splitlines()  
+            return text[2:].splitlines()
         # this is the RawTextHelpFormatter._split_lines
         return ap.HelpFormatter._split_lines(self, text, width)
 
@@ -36,7 +36,7 @@ parser = ap.ArgumentParser(formatter_class=SmartFormatter)
 # parser.add_argument("--force", "-f", action="store_true",
 #                     help="Overwrite existing output file, default: False")
 
-parser.add_argument("--file_conflict", "-f", 
+parser.add_argument("--file_conflict", "-f",
                     choices=["strict", "compare", "force"],
                     default="strict",
                     help="R|strict:  Do not replace an existing file\n"
@@ -151,7 +151,7 @@ null_parser.add_argument("null_data",
                                "columns (any other column). The requested "
                                "columns to predict must appear in this data.")
 
-null_parser.add_argument("output", metavar="CSV",
+null_parser.add_argument("output", metavar="output",
                          help="CSV file to save the null scalings to.")
 
 null_parser.add_argument("column", nargs="+",
@@ -170,9 +170,12 @@ null_parser.add_argument("-y", "--start", action="store_true",
 
 args = parser.parse_args()
 sc = args.subcommand
+verbose = args.verbose
 
-if args.verbose:
+if verbose:
+    print("Verbose output:")
     pp.pprint(vars(args))
+    print()
 
 if sc == "version":
     print(f"Version:    {VERSION}")
@@ -219,31 +222,65 @@ elif sc == "loocv":
 elif sc == "null":
     data_to_read = args.null_data
 
+# Give a cleaner name
 output_name = args.output
 
-def is_output_newer(in_file, out_file): 
-    
+# This is the same for train/test/loocv/null
+if data_to_read is not None:
+    if not "pickle" in data_to_read:
+        print(f"ERROR: Unknown format: {data_to_read}, should be '.pickle'.")
+
+if sc in ["test", "loocv", "null"]:
+    if ".csv" not in output_name:
+        print(f"ERROR: Unexpected format: {output_name} should be '.csv' " +
+              "for null.")
+        sys.exit(1)
+
+def is_output_newer(in_file, out_file):
+
     in_ts = os.path.getmtime(in_file)
     out_ts = os.path.getmtime(out_file)
 
     f1 = in_file if in_ts > out_ts else out_file
     f2 = out_file if in_ts > out_ts else in_file
-        
+
     print(f"INFO: '{f1}' is newer "
           f"({dt.datetime.fromtimestamp(max(in_ts, out_ts))}) than '{f2}' "
           f"({dt.datetime.fromtimestamp(min(in_ts, out_ts))}).")
 
     # Return whether the output file is newer
-    return (out_ts > in_ts)
+    return(out_ts > in_ts)
 
-if os.path.exists(output_name):
+# Check for zipped csvs
+output_name_zip = output_name.replace(".csv", ".zip")
 
-    # Compare the input/output
+if os.path.exists(output_name_zip):
+
+    print(f"INFO: Found zipped file with same name: {output_name_zip}")
+
+    # Compare against the ZIP file, unless the CSV exists, and is newer
+    # If the CSV doesn't exist, it's been zipped to save space, and check
+    # against the ZIP file modification times.
+    output_comparison_file = output_name_zip
+    if os.path.exists(output_name):
+        # If the ZIP is older than the CSV
+        if not is_output_newer(output_name, output_name_zip):
+            output_comparison_file = output_name
+            print(f"INFO: Zipped file {output_name_zip} is out of date!")
+        else:
+            print(f"INFO: Zipped file {output_name_zip} is up-to-date, "
+                  "checking it against input timestamps")
+        print()
+
+
+# Compare the input/output timestamps
+if os.path.exists(output_comparison_file):
 
     # If strict, and the output exists, don't clobber it
     if clobber == "strict":
 
-        print(f"\nERROR: File '{output_name}' already exists! Delete or use "
+        print(f"\nERROR: File '{output_comparison_file}' already exists! "
+              "Delete or use "
               "'--file_conflict compare' or '--file_conflict force' to "
               "continue.\n")
         sys.exit(1)
@@ -252,27 +289,31 @@ if os.path.exists(output_name):
     # than the input
     elif clobber == "compare":
 
-        out_nt_in = is_output_newer(data_to_read, output_name)
+        out_nt_in = is_output_newer(data_to_read, output_comparison_file)
 
         # Only the test module has a second input, so if we're not testing,
         # pass True to the all() check below so it passes unless the model
         # is newer than the output.
-        model_nt_in = is_output_newer(args.model, output_name) \
+        model_nt_in = is_output_newer(args.model, output_comparison_file) \
             if sc == "test" else True
 
         # Check that all conditions are met, and exit with a good exit status
         # if the output is newer than the inputs.
         if all([out_nt_in, model_nt_in]):
-            print(f"INFO: The output file '{output_name}' is newer than the"
-                  "input(s), not doing anything.\n")
+            print(f"INFO: The output file '{output_comparison_file}' is newer "
+                  "than the input(s), not doing anything.\n")
+            print("Exiting!\n")
             sys.exit(0)
+        else:
+            print("INFO: Input(s) are newer than output, starting ...\n")
 
     # If forcing, don't check anything and keep going
     elif clobber == "force":
 
-        print(f"WARNING: Overwriting output file {output_name} without "
-              "checking.\n")
+        print(f"WARNING: Overwriting output file {output_comparison_file} "
+              "without checking.\n")
 
+sys.exit()
 
 def fit_model(cx, y, test=None):
 
@@ -294,7 +335,7 @@ def fit_model(cx, y, test=None):
         # Return pretty scores
         scores = pd.DataFrame(clf.transform(test))
         scores.columns = [f"LD{x}" for x in range(1, scores.shape[1] + 1)]
-        scores.reset_index(drop=True, inplace=True)
+        scores = scores.reset_index(drop=True)
 
     else:
         y_hat = scores = None
@@ -390,10 +431,10 @@ elif sc == "test":
 
     scores.columns = [f"LD{x}" for x in range(1, scores.shape[1] + 1)]
 
-    print(scores)
+    # print(scores)
 
     # Reset index so that all three of these run [0, n-1].
-    id.reset_index(inplace=True)
+    id = id.reset_index(drop=True)
     final = pd.concat([id, y_hat, scores], axis=1)
 
     # Need to create joined colum
@@ -415,14 +456,16 @@ elif sc == "test":
     final.to_csv(args.output, index=False)
 
 elif sc == "loocv":
-
-    print(id.shape)
-    print(cx.shape)
+#
+    # print(id.shape)
+    # print(cx.shape)
     n = id.shape[0]
 
     # Reset the index so it's 0-n instead of maintaing the index before any
     # subsetting with -k
-    [x.reset_index(inplace=True) for x in [id, cx]]
+    # [x.reset_index(inplace=True) for x in [id, cx]]
+    id = id.reset_index(drop=True)
+    cx = cx.reset_index(drop=True)
 
     print(f"\nRunning {n} LOOCV repetitions")
 
@@ -436,7 +479,7 @@ elif sc == "loocv":
         train_cx = cx.drop(i)
 
         test_id = id.iloc[[i]]
-        test_id.reset_index(drop=True, inplace=True)
+        test_id = test_id.reset_index(drop=True)
         test_cx = cx.iloc[[i]]
 
         y = train_id[outcome_name].tolist()
@@ -449,7 +492,7 @@ elif sc == "loocv":
 
         # One-row pandas DF
         i_final = pd.concat([test_id, y_hat_df, scores], axis=1)
-        i_final.reset_index(drop=True, inplace=True)
+        i_final = i_final.reset_index(drop=True)
 
         # print(i_final)
 
@@ -458,14 +501,14 @@ elif sc == "loocv":
         # print(i_final)
 
     result = pd.concat(results)
-    result.reset_index(inplace=True, drop=True)
+    result = result.reset_index(drop=True)
 
     print("\nResults:\n")
 
     print(pd.crosstab(result[outcome_name],
                       result[f"{outcome_name}_predicted"]))
 
-    print(result)
+    # print(result)
 
     # Calculate accuracy
     acc = sum(result[outcome_name] == result[f"{outcome_name}_predicted"]) / n
@@ -473,8 +516,8 @@ elif sc == "loocv":
     print()
     print(f"Accuracy: {acc:.3f}")
 
-    print(result[outcome_name])
-    print(result[f"{outcome_name}_predicted"])
+    # print(result[outcome_name])
+    # print(result[f"{outcome_name}_predicted"])
 
     # Calculate MCC
     mcc = matthews_corrcoef(result[outcome_name],
@@ -490,7 +533,9 @@ elif sc == "null":
 
     # Reset the index so it's 0-n instead of maintaing the index before any
     # subsetting with -k
-    [x.reset_index(inplace=True, drop=True) for x in [id, cx]]
+    # [x.reset_index(inplace=True, drop=True) for x in [id, cx]]
+    id = id.reset_index(drop=True)
+    cx = cx.reset_index(drop=True)
 
     results = []
 
