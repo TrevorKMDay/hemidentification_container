@@ -15,8 +15,8 @@ from sklearn.metrics import matthews_corrcoef
 from tqdm import tqdm
 
 # This is updated externally by `build.sh`
-VERSION="0.5.1-utils"
-BUILD_DATE="Wed Nov  4 10:31:08 EST 2026"
+VERSION="0.5.2-utils"
+BUILD_DATE="Wed Nov  4 10:43:04 EST 2026"
 
 class SmartFormatter(ap.HelpFormatter):
     # Source - https://stackoverflow.com/a/22157136

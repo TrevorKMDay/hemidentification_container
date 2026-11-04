@@ -1,5 +1,5 @@
 # Use a lightweight Python base image
-FROM python:3.13-slim
+FROM python:3.13-slim-trixie
 
 ARG BUILD_VERSION
 ENV APP_VERSION=$BUILD_VERSION
