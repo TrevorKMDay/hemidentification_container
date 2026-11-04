@@ -14,6 +14,7 @@ WORKDIR /app
 # Install pandas
 COPY requirements.txt ./requirements.txt
 COPY bin/*.py /app/
+COPY bin/utils/*.py /app/utils/
 
 RUN pip install --no-cache-dir -r requirements.txt
 
