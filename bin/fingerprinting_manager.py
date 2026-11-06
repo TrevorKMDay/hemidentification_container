@@ -364,11 +364,8 @@ elif sc == "test":
     with open(args.model, "rb") as f:
         outcome_name, clf = pkl.load(f)
 
-    # print(f"Outcome name: {outcome_name}")
-    # print(f"Classifier: {clf}")
-
+    # Read the output name from the saved model and split it 
     outcome_cols = outcome_name.split('.')
-
     print(f"Predicting column(s) '{outcome_cols}' from the data.")
 
     # Check that all the columns appear in the data
