@@ -10,9 +10,9 @@ from itertools import batched
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from utils import format_input, load_data, is_output_newer, fit_model
 from sklearn.metrics import matthews_corrcoef
 from tqdm import tqdm
+from utils import fit_model, format_input, is_output_newer, load_data
 
 # This is updated externally by `build.sh`
 VERSION="0.5.2-utils"
@@ -55,6 +55,15 @@ parser.add_argument("--keep_groups", "-k", nargs="+",
                          "Multiple pairs operate as intersection.\n"
                          "Must be a list of pairs.\n"
                          "Must use `--` to end list.")
+
+parser.add_argument("--cols_select", "-c", nargs=2,
+                    metavar=("TYPE", "ARG"),
+                    help="R|Methods to reduce the numer of columns:\n"
+                         "regex: A regular expression to select columns\n"
+                         "file: Read a list of columns from a file "
+                         "(one per row)\n"
+                         "list: A single ,-delimited string of columns\n",
+                    default=[None, None])
 
 subparsers = parser.add_subparsers(dest="subcommand")
 
@@ -170,10 +179,37 @@ args = parser.parse_args()
 sc = args.subcommand
 verbose = args.verbose
 
+# Parse column selector
+col_type, col_arg = args.cols_select
+col_type = col_type.lower() if col_type is not None else None
+
 if verbose:
     print("Verbose output:")
     pp.pprint(vars(args))
     print()
+
+if col_type is not None:
+
+    col_regex = cols_to_keep = None
+
+    if col_type == "list":
+        # Read from command line
+        cols_to_keep = col_arg.split(",")
+    elif col_type == "file":
+        # Read columns from a file and print them in verbose mode only
+        print(f"INFO: Read columns from file: {col_arg}")
+        with open(col_arg, "r") as f:
+            cols_to_keep = pd.read_csv(f, header=None).iloc[:,0].tolist()
+    elif col_type == "regex":
+        col_regex = col_arg
+        print(f"INFO: Column selector regex: {col_arg[0]}")
+        print("INFO: Data has not been read to display result.\n")
+
+    # Print columns to keep, but not in the regex condition
+    if col_type in ["list", "file"] and verbose:
+        print("INFO: Columns to keep:")
+        pp.pprint(cols_to_keep)
+        print()
 
 if sc == "version":
     # If only 'version' print info and quit with zero exit status
@@ -224,15 +260,14 @@ elif sc == "null":
 output_name = args.output
 
 # This is the same for train/test/loocv/null
-if data_to_read is not None:
-    if not "pickle" in data_to_read:
-        print(f"ERROR: Unknown format: {data_to_read}, should be '.pickle'.")
+if data_to_read is not None and not "pickle" in data_to_read:
+    print(f"ERROR: Unknown format: {data_to_read}, should be '.pickle'.")
+    sys.exit(1)
 
-if sc in ["test", "loocv", "null"]:
-    if ".csv" not in output_name:
-        print(f"ERROR: Unexpected format: {output_name} should be '.csv' " +
-              "for null.")
-        sys.exit(1)
+if sc in ["test", "loocv", "null"] and ".csv" not in output_name:
+    print(f"ERROR: Unexpected format: {output_name} should be '.csv' " +
+          "for null.")
+    sys.exit(1)
 
 # Check for zipped csvs
 output_name_zip = output_name.replace(".csv", ".zip")
@@ -255,6 +290,8 @@ if os.path.exists(output_name_zip):
                   "checking it against input timestamps")
         print()
 
+else:
+    output_comparison_file = output_name
 
 # Compare the input/output timestamps
 if os.path.exists(output_comparison_file):
@@ -296,14 +333,13 @@ if os.path.exists(output_comparison_file):
         print(f"WARNING: Overwriting output file {output_comparison_file} "
               "without checking.\n")
 
-sys.exit()
-
 # sys.exit()
 
 if sc in ["train", "test", "loocv", "null"]:
 
     # Load the data as ID and classifier columns
-    id, cx = load_data(data_to_read, keep_pairs=keep_pairs)
+    id, cx = load_data(data_to_read, keep_pairs=keep_pairs, 
+                        cols_to_keep=cols_to_keep, cols_regex=col_regex)
 
     # Create merged columns in the case of multiple outcomes
     j = args.join
@@ -364,7 +400,7 @@ elif sc == "test":
     with open(args.model, "rb") as f:
         outcome_name, clf = pkl.load(f)
 
-    # Read the output name from the saved model and split it 
+    # Read the output name from the saved model and split it
     outcome_cols = outcome_name.split('.')
     print(f"Predicting column(s) '{outcome_cols}' from the data.")
 

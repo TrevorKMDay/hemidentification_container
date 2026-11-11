@@ -1,40 +1,84 @@
 
 import pickle as pkl
 import pprint as pp
+import re
 import sys
 
 import numpy as np
 import pandas as pd
-import re
 
-def load_data(data_to_load, keep_pairs=None):
+
+def check_regex_in_cx(cx, regex):
+    '''
+    Instead of trying to do complicated checks of whether the regex is bounded
+    by '_' or the end of the string, just break the standard format up by
+    underscore and then check the two ROI names individually. 
+    '''
+
+    # Split cx 
+    _, x, y = cx.split("_")
+
+    # If the string is detected in either ROI, return True
+    result = re.search(re.compile(regex), x) or re.search(re.compile(regex), y)
+    return(result)
+
+def load_data(data_to_load, keep_pairs=None, cols_to_keep=None, 
+              cols_regex=None):
 
     if ".pickle" in data_to_load:
 
-        print(f"Loading data from file: {data_to_load}")
+        print(f"INFO: Loading data from file: {data_to_load}")
         with open(data_to_load, "rb") as f:
             data = pkl.load(f)
 
     elif ".csv" in data_to_load:
-
         data = pd.read_csv(data_to_load)
 
     else:
 
         # TO DO: Add CSVs
-        print(f"Data format of {data_to_load} not recognized, exiting")
+        print(f"ERROR: Data format of {data_to_load} not recognized, exiting")
         sys.exit(1)
 
-    print(f"The data has dimensions: {data.shape}")
+    print(f"INFO: The data has dimensions: {data.shape}")
 
     # Fix this to display column names not NaN count
     cx = data.filter(regex = r'^cx_', axis=1)
+
+    # Get the columns to keep - do this before NaN replacement
+    if cols_to_keep is not None:
+        cols_in_cx = [x in cx.columns for x in cols_to_keep]
+        if not all(cols_in_cx):
+            print("ERROR: The following columns are not in the data, aborting.")
+            for i in cols_to_keep:
+                if i not in cx.columns:
+                    print(f"  Missing: {i}")
+            return(None)
+
+    if cols_regex is not None:
+        # print(cols_regex) 
+        # sys.exit()
+        cols_to_keep = [s for s in cx.columns 
+                        if check_regex_in_cx(s, cols_regex)]
+        if len(cols_to_keep) == 0:
+            print(f"ERROR: Regex ({cols_regex}) found no columns, aborting")
+            sys.exit(1)
+        else:
+            print(f"INFO: Found {len(cols_to_keep)} columns based on regex, " + 
+                  "continuing")
+
+    if cols_to_keep is not None:
+        pp.pprint(cols_to_keep)
+        cx = cx[cols_to_keep]
+        print("INFO: After filtering, the connection matrix has " + 
+              f"dimensions: {cx.shape}")
+
     nans_in_input = cx.isna().sum()
     nans_in_input_names = [col for x, col in zip(nans_in_input, cx.columns)
                            if x > 0]
 
     if len(nans_in_input_names) > 0:
-        print(f"WARNING: {len(nans_in_input_names)} connection columns have "
+        print(f"\nWARNING: {len(nans_in_input_names)} connection columns have "
               "at least 1 NaN value")
 
     if len(nans_in_input_names) > 0:
@@ -129,5 +173,6 @@ def load_data(data_to_load, keep_pairs=None):
 
     assert cx.shape[0] > 0, "ERROR: No rows returned after filtering " + \
         "connection columns, check filtering."
+
 
     return((id_cols, cx))

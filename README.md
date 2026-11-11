@@ -14,7 +14,7 @@ column.
     Docker expects containers to work.
 
 2. Underscores are used to separate ROI pairs - remove underscores from ROI
-    names where possible. The container will check and remove; but if you are
+    names in all cases. The container will check and remove; but if you are
     already tweaking ROI names, then also remove underscores.
 
 ## Shared options
@@ -39,7 +39,9 @@ column.
     to this flag. Therefore, it requires at least two arguments, e.g.
     `--keep_cols fold 1`.
 
-Note that `keep_cols` only keeps the rows that match all values, e.g.
+- `--cols_select`: See below.
+
+Note that `keep_cols` only keeps the rows that match all values, e.g.,
 `-k fold 1 patient hc` keeps all the healthy controls from fold 1. More
 advanced subsetting should be added to the data
 
@@ -147,3 +149,21 @@ Note that this output is unique in that it saves only the null scalings;
 the true scalings are retrievable from the true model created with the
 `train` command, and can be accessed through Python or R
 `reticulate::py_load_object()`.
+
+## Column selecting
+
+You can reduce the selected connections by using `--cols_select`. One important
+note is how the `regex` option works:
+
+### **regex**
+
+If used, the next argument is interpreted as a regular expression,
+but it operates on each part of the connection name individually. So, the
+string `cx_IFG_STG` is split and the regex is checked against the strings
+`IFG` and `STG` separately, and the connection is returned if the regex
+matches either one. This means that you can use, e.g., `p24` to match
+`p24` *or* `p24pr`; or use `p24$` to match exactly that ROI. This is much
+easier than embedding look-aheads in the command line.
+
+For the other options, the column names must be given exactly, i.e. with the
+`cx_` prefix. A future change may add a `cx` prefix check.
