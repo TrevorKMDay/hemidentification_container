@@ -68,7 +68,7 @@ def load_data(data_to_load, keep_pairs=None, cols_to_keep=None,
                   "continuing")
 
     if cols_to_keep is not None:
-        pp.pprint(cols_to_keep)
+        pp.pprint(cols_to_keep, compact=True)
         cx = cx[cols_to_keep]
         print("INFO: After filtering, the connection matrix has " + 
               f"dimensions: {cx.shape}")
@@ -110,7 +110,6 @@ def load_data(data_to_load, keep_pairs=None, cols_to_keep=None,
 
     ## Extract cx columns
 
-    cx = data.filter(regex='^cx_', axis=1)
     n_cx = cx.shape[1]
     print(f" -> I found {n_cx} connections.")
 
@@ -122,7 +121,7 @@ def load_data(data_to_load, keep_pairs=None, cols_to_keep=None,
     if not corr_mat_size.is_integer():
         # TO DO: Add option to skip this
         print("The input is expected to be one-half of a correlation matrix.")
-        print(f"This does not seem to be (size: {corr_mat_size}), exiting.")
+        print(f"This does not seem to be (size: {corr_mat_size:.3f}), exiting.")
         # print("Use --no-check-size to skip this check")
 
     # Subset data
@@ -164,7 +163,8 @@ def load_data(data_to_load, keep_pairs=None, cols_to_keep=None,
     else:
         print("INFO: No subsetting requested")
 
-    id_cols = data.drop(cx.columns, axis=1)
+    # Remove cx_-prefixed columsn to get id columns
+    id_cols = data.drop(columns=data.filter(regex=r'^cx_').columns)
     n_id = id_cols.shape[1]
     print(f" -> I found {n_id} ID columns: {id_cols.columns.tolist()}")
 

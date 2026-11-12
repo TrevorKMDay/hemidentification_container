@@ -134,7 +134,7 @@ of scalings by shuffling the outcome labels and running models.
 The default `N` is 1000, which is probably too low for publication, but a
 decent starting value for testing.
 
-By default, the code calculates how long the excution will take, and asks you
+By default, the code calculates how long the execution will take, and asks you
 if you want to start (the `-it` flag is required to interact with the
 container in this way).
 
@@ -148,7 +148,7 @@ You can skip this by adding the `-y` flag, however, either `run -t` *or*
 Note that this output is unique in that it saves only the null scalings;
 the true scalings are retrievable from the true model created with the
 `train` command, and can be accessed through Python or R
-`reticulate::py_load_object()`.
+(`reticulate::py_load_object()`).
 
 ## Column selecting
 
@@ -165,5 +165,5 @@ matches either one. This means that you can use, e.g., `p24` to match
 `p24` *or* `p24pr`; or use `p24$` to match exactly that ROI. This is much
 easier than embedding look-aheads in the command line.
 
-For the other options, the column names must be given exactly, i.e. with the
-`cx_` prefix. A future change may add a `cx` prefix check.
+For the other options (`list`, `file`), the column names must be given exactly,
+i.e. with the `cx_` prefix. A future change may add a `cx` prefix check.

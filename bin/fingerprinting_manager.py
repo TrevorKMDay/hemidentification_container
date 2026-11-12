@@ -15,13 +15,11 @@ from tqdm import tqdm
 from utils import fit_model, format_input, is_output_newer, load_data
 
 # This is updated externally by `build.sh`
-VERSION="0.5.2-utils"
-BUILD_DATE="Wed Nov  4 10:43:04 EST 2026"
+VERSION="0.6.1-cols"
+BUILD_DATE="Thu Nov 12 13:14:01 EST 2026"
 
 class SmartFormatter(ap.HelpFormatter):
-    # Source - https://stackoverflow.com/a/22157136
-    # Posted by Anthon, modified by community.
-    # Retrieved 2026-10-21, License - CC BY-SA 3.0
+    # Source - https://stackoverflow.com/a/22157136 License - CC BY-SA 3.0
     def _split_lines(self, text, width):
         """Allow forced line breaks in argparse help text."""
         if text.startswith('R|'):
@@ -111,11 +109,16 @@ train_parser.add_argument("--skip-size-check", action="store_true",
                           help="Do not verify that the input data came from"
                                "one half of a correlation matrix.")
 
-# Testing
+# Testing ====
 
 test_parser = subparsers.add_parser('test',
                                     help="Given a model and data, predict"
                                          "scores.")
+
+test_parser.add_argument("--remove_extra_cols", "-r", action="store_true",
+                         help="If set, columns in the test data missing from "
+                              "the training model are removed. Otherwise, "
+                              "error.")
 
 test_parser.add_argument("model",
                          help="Model to use, from this program.")
@@ -188,9 +191,9 @@ if verbose:
     pp.pprint(vars(args))
     print()
 
+# Parse column selector options
+col_regex = cols_to_keep = None
 if col_type is not None:
-
-    col_regex = cols_to_keep = None
 
     if col_type == "list":
         # Read from command line
@@ -266,7 +269,7 @@ if data_to_read is not None and not "pickle" in data_to_read:
 
 if sc in ["test", "loocv", "null"] and ".csv" not in output_name:
     print(f"ERROR: Unexpected format: {output_name} should be '.csv' " +
-          "for null.")
+          f"for {sc}.")
     sys.exit(1)
 
 # Check for zipped csvs
@@ -410,6 +413,11 @@ elif sc == "test":
               "test data:")
         print(id.columns)
         sys.exit(1)
+
+    if args.remove_extra_cols:
+        extra_cols = [x for x in cx.columns if x not in clf.feature_names_in_]
+        print(f"INFO: Removing {len(extra_cols)} columns not in model.")
+        cx = cx.drop(columns=extra_cols)
 
     # Scores
     y_hat = pd.DataFrame({f"{outcome_name}_predicted": clf.predict(cx)})
