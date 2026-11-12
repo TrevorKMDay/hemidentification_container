@@ -5,7 +5,8 @@ using Python `scikit-learn` `LinearDiscriminantAnalysis()`.
 
 The input data must have *n > 0* columns prefixed with `cx_`, these are the
 connections. Any column without a `cx_` prefix is assumed to be an identifier
-column.
+column. All other columns are passed through to the results to facilitate 
+information transfer.
 
 **Important Notes:**
 
@@ -44,7 +45,7 @@ column.
 
 Note that `keep_cols` only keeps the rows that match all values, e.g.,
 `-k fold 1 patient hc` keeps all the healthy controls from fold 1. More
-advanced subsetting should be added to the data
+advanced subsetting should be added to the data directly.
 
 ## Preparing
 
@@ -166,5 +167,9 @@ matches either one. This means that you can use, e.g., `p24` to match
 `p24` *or* `p24pr`; or use `p24$` to match exactly that ROI. This is much
 easier than embedding look-aheads in the command line.
 
+## Other options
+
 For the other options (`list`, `file`), the column names must be given exactly,
 i.e. with the `cx_` prefix. A future change may add a `cx` prefix check.
+
+**To Do**: Add an `all` option to derive the ROIs from the column names.
