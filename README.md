@@ -25,7 +25,8 @@ column.
      anything.
   - `force`: Regardless of timestamps, recreate the output.
   - **NB**: The `null` subcommand, especially creates large CSVs. The file
-    conflict routine checks if an identically named `.zip` file exists, and
+    conflict routine checks if an identically named `.zip`
+    (i.e. `${i//csv/zip}`) file exists, and
     compares against that, in case you zipped the output (only for `.csv`
     files).
 
